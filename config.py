@@ -22,7 +22,7 @@ NUM_WORKERS = 0
 PIN_MEMORY = torch.cuda.is_available()
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-N_SPLITS = 5
+N_SPLITS = 5 
 
 NUM_LANGUAGES = 3
 LANGUAGE_KEYWORDS = {
@@ -33,3 +33,10 @@ LANGUAGE_KEYWORDS = {
 LANG_NAMES = {0: 'Русский', 1: 'Татарский', 2: 'Билингв'}
 
 DATA_ROOT = Path("C:\\Users\\erith\\Downloads\\Чтение текста\\Чтение текста")
+
+ACOUSTIC_FEATURE_SIZE = 123
+CNN_CHANNELS = [32, 64, 128, 256]
+RNN_HIDDEN_SIZE = 128
+RNN_NUM_LAYERS = 2
+MLP_SIZES = [512, 256, 128]
+NUM_CLASSES = 2
