@@ -1,76 +1,63 @@
 import torch
-import numpy as np
 from torch.utils.data import Dataset
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import re
+import time
 from sklearn.preprocessing import StandardScaler
+from config import *
+from features import split_audio_into_segments, extract_spectrogram_for_segment, extract_acoustic_features_for_segment
 
+def detect_language(filename):
+    lower = filename.lower()
+    for lid, keywords in LANGUAGE_KEYWORDS.items():
+        if any(k in lower for k in keywords): return lid
+    return 0
 
-class PreprocessedSegmentDataset(Dataset):
-    """
-    Датасет для предобработанных сегментов аудио
-    
-    Аргументы:
-        segments_specs: numpy array, спектрограммы
-        segments_acoustics: numpy array, акустические признаки
-        segments_labels: numpy array, метки классов
-        segments_file_indices: numpy array, индексы файлов
-        segments_patient_ids: numpy array, ID пациентов
-        segments_language_ids: numpy array, ID языковых групп
-        segment_mask: numpy array, маска для выбора подмножества сегментов
-        scaler: StandardScaler, скейлер для акустических признаков
-    """
-    def __init__(self, segments_specs, segments_acoustics, segments_labels,
-                 segments_file_indices, segments_patient_ids, segments_language_ids,
-                 segment_mask=None, scaler=None):
-        
-        if segment_mask is not None:
-            self.segments_specs = segments_specs[segment_mask]
-            self.segments_acoustics_raw = segments_acoustics[segment_mask]
-            self.segments_labels = segments_labels[segment_mask]
-            self.segments_file_indices = segments_file_indices[segment_mask]
-            self.segments_patient_ids = segments_patient_ids[segment_mask]
-            self.segments_language_ids = segments_language_ids[segment_mask]
-        else:
-            self.segments_specs = segments_specs
-            self.segments_acoustics_raw = segments_acoustics
-            self.segments_labels = segments_labels
-            self.segments_file_indices = segments_file_indices
-            self.segments_patient_ids = segments_patient_ids
-            self.segments_language_ids = segments_language_ids
-        
-        if scaler is None:
-            self.scaler = StandardScaler()
-            self.segments_acoustics = self.scaler.fit_transform(self.segments_acoustics_raw)
-        else:
-            self.scaler = scaler
-            self.segments_acoustics = self.scaler.transform(self.segments_acoustics_raw)
-    
-    def __len__(self):
-        return len(self.segments_specs)
-    
-    def __getitem__(self, idx):
-        return (
-            self.segments_specs[idx].copy(),
-            self.segments_acoustics[idx].copy(),
-            self.segments_labels[idx],
-            self.segments_file_indices[idx],
-            self.segments_language_ids[idx]
-        )
+def build_dataframe(data_root):
+    records, pids =[], set()
+    root = Path(data_root)
+    for label, folder in[("PD", "Болезнь Паркинсона_Parkinson's disease (PD)"), ("Control", "Контроль_Control (C)")]:
+        for w in (root / folder).glob("*.wav"):
+            match = re.match(r'(\d+)(?:\(\d+\))?_(PD\d+|C)_(Male|Female)', w.name, re.I)
+            pid = int(match.group(1)) if match else hash(w.name) % 10000
+            gid = 1 if match and match.group(3).lower() == 'male' else 0
+            lid = detect_language(w.name)
+            records.append({'filepath': str(w), 'label': label, 'patient_id': pid, 'language_id': lid, 'gender_id': gid})
+            pids.add(pid)
+    return pd.DataFrame(records)
 
+def preprocess_files(filepaths, labels, patient_ids, language_ids, gender_ids):
+    print(f"\n[{time.strftime('%H:%M:%S')}] Начало предобработки ({len(filepaths)} файлов)...")
+    res = {k: [] for k in['specs', 'acoustics', 'labels', 'f_idx', 'p_idx', 'l_idx', 'g_idx']}
+    for i, (fp, lbl, pid, lid, gid) in enumerate(zip(filepaths, labels, patient_ids, language_ids, gender_ids)):
+        for seg in split_audio_into_segments(fp):
+            res['specs'].append(extract_spectrogram_for_segment(seg))
+            res['acoustics'].append(extract_acoustic_features_for_segment(seg))
+            res['labels'].append(lbl)
+            res['f_idx'].append(i)
+            res['p_idx'].append(pid)
+            res['l_idx'].append(lid)
+            res['g_idx'].append(gid)
+        if (i+1) % 10 == 0: print(f"  Обработано {i+1}/{len(filepaths)}...", end='\r')
+    print("\nПредобработка завершена.")
+    return {k: np.array(v, dtype=np.float32 if k in['specs', 'acoustics'] else np.int64) for k, v in res.items()}
+
+class PreprocessedDataset(Dataset):
+    def __init__(self, data_dict, mask=None, scaler=None):
+        self.d = {k: v[mask] if mask is not None else v for k, v in data_dict.items() if k != 'original'}
+        self.scaler = StandardScaler().fit(self.d['acoustics']) if scaler is None else scaler
+        self.d['acoustics'] = self.scaler.transform(self.d['acoustics'])
+    def __len__(self): return len(self.d['specs'])
+    def __getitem__(self, i):
+        return (self.d['specs'][i].copy(), self.d['acoustics'][i].copy(), self.d['labels'][i], 
+                self.d['f_idx'][i], self.d['l_idx'][i], self.d['g_idx'][i])
 
 def collate_fn(batch):
-    """
-    Коллатор для даталоадера
-    
-    Аргументы:
-        batch: list of tuples, батч данных
-    
-    Возвращает:
-        tuple of tensors: (spectrograms, acoustics, labels, file_indices, lang_ids)
-    """
-    specs = torch.from_numpy(np.stack([item[0] for item in batch], axis=0)).unsqueeze(1)
-    acoustics = torch.from_numpy(np.stack([item[1] for item in batch], axis=0))
-    labels = torch.tensor([item[2] for item in batch], dtype=torch.long)
-    file_indices = torch.tensor([item[3] for item in batch], dtype=torch.long)
-    lang_ids = torch.tensor([item[4] for item in batch], dtype=torch.long)
-    
-    return specs, acoustics, labels, file_indices, lang_ids
+    return (torch.from_numpy(np.stack([b[0] for b in batch])).unsqueeze(1),
+            torch.from_numpy(np.stack([b[1] for b in batch])),
+            torch.tensor([b[2] for b in batch], dtype=torch.long),
+            torch.tensor([b[3] for b in batch], dtype=torch.long),
+            torch.tensor([b[4] for b in batch], dtype=torch.long),
+            torch.tensor([b[5] for b in batch], dtype=torch.long))
