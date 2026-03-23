@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from pathlib import Path
-from best.config import LANG_NAMES, GENDER_NAMES, SAVE_RESULTS, RESULTS_DIR
+from config import LANG_NAMES, GENDER_NAMES, SAVE_RESULTS, RESULTS_DIR
 
 def check_save(filepath):
     if not SAVE_RESULTS: return False

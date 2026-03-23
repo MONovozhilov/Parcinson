@@ -7,7 +7,7 @@ import random
 import os
 from pathlib import Path
 
-from best.config import *
+from config import *
 from dataset import PreprocessedDataset, collate_fn
 from model import HybridModel
 from metrics import validate_file_level, cutmix_spectrograms

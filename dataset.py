@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import time
 from sklearn.preprocessing import StandardScaler
-from best.config import *
+from config import *
 from features import split_audio_into_segments, extract_spectrogram_for_segment, extract_acoustic_features_for_segment
 
 def detect_language(filename):

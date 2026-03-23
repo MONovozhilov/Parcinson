@@ -2,7 +2,7 @@ import numpy as np
 import librosa
 import parselmouth
 from parselmouth.praat import call
-from best.config import *
+from config import *
 
 def split_audio_into_segments(filepath, segment_duration=SEGMENT_DURATION, sr_target=SAMPLE_RATE):
     y, sr = librosa.load(filepath, sr=sr_target)

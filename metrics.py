@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
-from best.config import NUM_LANGUAGES
+from config import NUM_LANGUAGES
 
 def cutmix_spectrograms(spec, spec2, beta):
     bs, c, h, w = spec.shape

@@ -1,6 +1,6 @@
 import optuna
 import numpy as np
-from best.config import DATA_ROOT
+from config import DATA_ROOT
 from dataset import build_dataframe, preprocess_files
 from train import train_and_evaluate
 
