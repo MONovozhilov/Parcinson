@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import time
 from sklearn.preprocessing import StandardScaler
-from config import *
+from best.config import *
 from features import split_audio_into_segments, extract_spectrogram_for_segment, extract_acoustic_features_for_segment
 
 def detect_language(filename):
@@ -38,11 +38,11 @@ def preprocess_files(filepaths, labels, patient_ids, language_ids, gender_ids):
             res['labels'].append(lbl)
             res['f_idx'].append(i)
             res['p_idx'].append(pid)
-            res['l_idx'].append(lid)
+            res['l_idx'].append(lid) 
             res['g_idx'].append(gid)
         if (i+1) % 10 == 0: print(f"  Обработано {i+1}/{len(filepaths)}...", end='\r')
     print("\nПредобработка завершена.")
-    return {k: np.array(v, dtype=np.float32 if k in['specs', 'acoustics'] else np.int64) for k, v in res.items()}
+    return {k: np.array(v, dtype=np.float32 if k in ['specs', 'acoustics'] else np.int64) for k, v in res.items()}
 
 class PreprocessedDataset(Dataset):
     def __init__(self, data_dict, mask=None, scaler=None):

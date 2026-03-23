@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class HybridModel(nn.Module):
-    def __init__(self, acoustic_feature_size=123, dropout_rate=0.3): # 🆕 Добавлен dropout_rate
+    def __init__(self, acoustic_feature_size=123, dropout_rate=0.3):
         super(HybridModel, self).__init__()
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),

@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
-from config import NUM_LANGUAGES
+from best.config import NUM_LANGUAGES
 
 def cutmix_spectrograms(spec, spec2, beta):
     bs, c, h, w = spec.shape
@@ -10,7 +10,6 @@ def cutmix_spectrograms(spec, spec2, beta):
     cx, cy = np.random.randint(0, w), np.random.randint(0, h)
     x1, x2 = max(0, cx - cut_w // 2), min(w, cx + cut_w // 2)
     y1, y2 = max(0, cy - cut_h // 2), min(h, cy + cut_h // 2)
-    
     spec_cut = spec.clone()
     spec_cut[:, :, y1:y2, x1:x2] = spec2[:, :, y1:y2, x1:x2]
     return spec_cut, ((x2 - x1) * (y2 - y1)) / (w * h)
@@ -22,7 +21,7 @@ def validate_file_level(model, dataset, device):
     
     with torch.no_grad():
         for i in range(0, len(dataset), 32):
-            batch = [dataset[j] for j in range(i, min(i+32, len(dataset)))]
+            batch =[dataset[j] for j in range(i, min(i+32, len(dataset)))]
             s = torch.from_numpy(np.stack([b[0] for b in batch])).unsqueeze(1).to(device)
             a = torch.from_numpy(np.stack([b[1] for b in batch])).to(device)
             all_logits.append(model(s, a).cpu())
@@ -42,7 +41,7 @@ def validate_file_level(model, dataset, device):
         preds.append(mean_probs.argmax().item())
         file_trues.append(trues[mask][0])
         probs.append(mean_probs[1].item())
-        file_langs.append(langs[mask][0])
+        file_langs.append(langs[mask][0])   # 🆕
         file_gends.append(genders[mask][0])
         
     def get_cm(arr, ids): 
@@ -50,8 +49,8 @@ def validate_file_level(model, dataset, device):
 
     return {
         'accuracy': accuracy_score(file_trues, preds),
-        'precision': precision_score(file_trues, preds, zero_division=0), # 🆕 Добавлен Precision
-        'recall': recall_score(file_trues, preds, zero_division=0),       # 🆕 Добавлен Recall
+        'precision': precision_score(file_trues, preds, zero_division=0),
+        'recall': recall_score(file_trues, preds, zero_division=0),
         'f1': f1_score(file_trues, preds, zero_division=0),
         'roc_auc': roc_auc_score(file_trues, probs) if len(set(file_trues)) > 1 else 0.0,
         'cm_overall': confusion_matrix(file_trues, preds, labels=[0, 1]),
